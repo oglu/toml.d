@@ -1,0 +1,9 @@
+{
+	"name": "d.toml",
+	"description": "A minimal D application.",
+	"copyright": "Copyright © 2014, oglu",
+	"authors": ["oglu"],
+	"dependencies": {
+        "pegged": "~master"
+	}
+}
