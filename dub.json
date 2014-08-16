@@ -1,6 +1,6 @@
 {
-	"name": "d.toml",
-	"description": "A minimal D application.",
+	"name": "toml.d",
+	"description": "A TOML parser for D",
 	"copyright": "Copyright © 2014, oglu",
 	"authors": ["oglu"],
 	"dependencies": {
