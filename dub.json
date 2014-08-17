@@ -1,5 +1,5 @@
 {
-	"name": "toml.d",
+	"name": "toml-d",
 	"description": "A TOML parser for D",
 	"copyright": "Copyright © 2014, Tasos Vogiatzoglou",
 	"authors": ["Tasos Vogiatzoglou"],
