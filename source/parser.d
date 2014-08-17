@@ -1,9 +1,11 @@
 import grammar;
 import pegged.grammar;
 import std.variant;
+import std.array: split;
 import std.stdio;
 
 enum TOMLType {
+    Root,
     String,
     Integer,
     Float,
@@ -14,6 +16,7 @@ enum TOMLType {
 };
 
 struct TOMLValue {
+
     union Store {
         string stringv;
         long intv;
@@ -28,24 +31,42 @@ struct TOMLValue {
         TOMLType _type;
     }
 
-    this(T)(T v) {
+    private void assign(T)(T val) {
         static if( is(T: string) ) {
-            _store.stringv = v;
+            _store.stringv = val;
             _type = TOMLType.String;
         } 
         else static if ( is(T: long) ) {
-            _store.intv = v;
+            _store.intv = val;
             _type = TOMLType.Integer;
         }
         else static if ( is(T: bool) ) {
-            _store.boolv = v;
+            _store.boolv = val;
             _type = TOMLType.Boolean;
         }
         else static if ( is(T: float) ) {
-            _store.floatv = v;
+            _store.floatv = val;
             _type = TOMLType.Float;
         }
-        else static if ( is(T: TOMLValue[]) ) {
+    }
+
+    private void assign(T)(T val, string key) {
+        static if ( is(T: TOMLValue) ) 
+            _store.keygroups[key] = val;
+        else
+            _store.keygroups[key] = TOMLValue(val);
+    }
+
+    //
+    // Constructors
+    // -----------------------------------------
+
+    this(T)(T v) {
+        assign(v);
+    }
+
+    this(T)(ref T v) {
+        static if ( is(T: TOMLValue[]) ) {
             _store.arrayv = v;
             _type = TOMLType.Array;
         }
@@ -54,7 +75,38 @@ struct TOMLValue {
             _type = TOMLType.Group;
         }
     }
+ 
+    private this(TOMLType type) {
+        _type = type;
+    }
+    // 
+    // Operators
+    // ---------------------------------------
 
+    // Index assign
+    void opIndexAssign(T)(T v, string key) {
+        assign(v, key);
+    }
+
+    TOMLValue opIndexAssign(TOMLValue  v, string key) {
+        writefln("Adding %s to %s", v, key);
+        _store.keygroups[key] = v;
+        return v;
+    }
+
+    ref inout(TOMLValue) opIndex(string v) inout {
+        return _store.keygroups[v];
+    }
+
+     auto opBinaryRight(string op : "in")(string k) const
+    {
+        return k in _store.keygroups;
+    }
+
+
+    //
+    // Value accessors
+    // ---------------------------------------
     string str(){
         return _store.stringv;
     }
@@ -62,45 +114,18 @@ struct TOMLValue {
     long integer() {
         return _store.intv;
     }
+
+    TOMLValue[] array() {
+        return _store.arrayv;
+    }
+
+    auto keys() { 
+        return _store.keygroups.keys;
+    }
+
 }
 
-struct TOMLDictionary {
-    private {
-        TOMLDictionary[string] _groups;
-        TOMLValue[string] _values;
-    }
-
-    int opIndexAssign(int v, string key) {
-        _values[key] = TOMLValue(v);
-        return v;
-    }
-
-    string opIndexAssign(string v, string key) {
-        _values[key] = TOMLValue(v);
-        return v;
-    }
-
-    float opIndexAssign(float v, string key) {
-        _values[key] = TOMLValue(v);
-        return v;
-    }
-
-    float opIndexAssign(bool v, string key) {
-        _values[key] = TOMLValue(v);
-        return v;
-    }
-
-    TOMLValue opIndexAssign(TOMLValue  v, string key) {
-        _values[key] = v;
-        return v;
-    }
-
-    TOMLValue opIndex(string v) {
-        return _values[v];
-    }
-}
-
-void _toTOMLDictionary(ParseTree p, ref TOMLDictionary dict, string pfx = null) {
+void _toTOMLDictionary(ParseTree p, ref TOMLValue root, string current_header=null) {
     writeln("Handling ", p.name);
 
     TOMLValue __valueLine(ParseTree valueNode){ 
@@ -133,18 +158,28 @@ void _toTOMLDictionary(ParseTree p, ref TOMLDictionary dict, string pfx = null) 
             auto name = p.children[0].matches[0];   //Name node
             auto value = p.children[1].children[0]; //Value node
             writeln("Adding node %d", name);
-            if (pfx) {
-                dict[pfx ~"."~ name] = __valueLine(value);
-            } else{
-                dict[name] = __valueLine(value);
+            if (!current_header)
+                root[name] = __valueLine(value);
+            else {
+                auto k = current_header.split('.');
+                if (!(k[0] in root))
+                    root[k[0]] = TOMLValue(TOMLType.Group);
+                TOMLValue * v = &root[k[0]];
+
+                foreach (t; k[1..$]) {
+                    if (!(t in v._store.keygroups))
+                        v.assign(TOMLValue(TOMLType.Group), t);
+                    v = &(v._store.keygroups[t]);
+                }
+                v._store.keygroups[name] = __valueLine(value);
+                
             }
             break;
         case "TOML.KeyGroup":
             auto header = p.children[0].children[0].matches[0]; //HeaderName node
-            writeln("Adding header %s", header);
             auto vals = p.children[1..$];
             foreach (v; vals) {
-                _toTOMLDictionary(v, dict, pfx=header);
+                _toTOMLDictionary(v, root, header);
             }
             break;
         default:
@@ -152,9 +187,9 @@ void _toTOMLDictionary(ParseTree p, ref TOMLDictionary dict, string pfx = null) 
     }
 }
 
-TOMLDictionary parse(string data) {
+TOMLValue parse(string data) {
     auto parseTree = TOML(data);
-    TOMLDictionary dict;
+    TOMLValue dict = new TOMLValue(TOMLType.Root);
     foreach(p; parseTree.children[0].children) {
         _toTOMLDictionary(p, dict);
     }
@@ -169,11 +204,19 @@ unittest {
 
         [servers]
         a = 12
+
+        [servers.test]
+        a = 12
+        ports = [1,2,3]
         `;
 
     auto d = parse(TEST1);
 
     assert(d["key_string"].str == "string_value");
-    assert(d["servers.a"].integer == 12);
+    writefln("Servers: %s", d["servers"].keys);
+    writefln("All: %s", d.keys);
+    assert(d["servers"]["a"].integer == 12);
+    assert(d["servers"]["test"]["a"].integer == 12);
+    assert(d["servers"]["test"]["ports"].array[2].integer == 3);
 
 }
