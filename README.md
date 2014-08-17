@@ -1,5 +1,6 @@
-TOML Parser
----------------
+=======
+toml.d. A TOML Parser for D
+============================
 
 Usage:
 
