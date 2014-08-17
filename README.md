@@ -4,9 +4,10 @@ toml.d. A TOML Parser for D
 
 Usage:
 
+```D
 import toml.d;
 
-auto config = parseFile(`
+auto config = parse(`
     title = "TOML Example"
 
     [owner]
@@ -24,6 +25,13 @@ auto config = parseFile(`
 
 auto title = config["title"].str;
 auto db = config["database"]["server"].str;
+```
+
+or
+
+```D
+auto config = parseFile("/path/to/toml.conf");
+```
 
 TODO
 --------------
