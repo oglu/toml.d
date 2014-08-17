@@ -1,3 +1,5 @@
+module toml.grammar;
+
 import pegged.grammar;
 
 enum PEG = `

@@ -1,11 +1,12 @@
-import grammar;
+module toml.parser;
+
+import toml.grammar;
 import pegged.grammar;
-import std.variant;
 import std.array: split;
-import std.stdio;
+import std.exception;
+import std.file : readText;
 
 enum TOMLType {
-    Root,
     String,
     Integer,
     Float,
@@ -14,6 +15,14 @@ enum TOMLType {
     Array,
     Group
 };
+
+class TOMLException: Exception {
+    this(string msg, string file="parser", ulong line=111) {
+        super(msg, file, line);
+    }
+}
+
+alias enforceTOML = enforceEx!(TOMLException);
 
 struct TOMLValue {
 
@@ -48,6 +57,9 @@ struct TOMLValue {
             _store.floatv = val;
             _type = TOMLType.Float;
         }
+        else 
+            static assert(0, "Unknown type");
+        
     }
 
     private void assign(T)(T val, string key) {
@@ -62,7 +74,10 @@ struct TOMLValue {
     // -----------------------------------------
 
     this(T)(T v) {
-        assign(v);
+        static if ( is(T: TOMLType) ) 
+            _type = v;
+        else
+            assign(v);
     }
 
     this(T)(ref T v) {
@@ -76,30 +91,30 @@ struct TOMLValue {
         }
     }
  
-    private this(TOMLType type) {
-        _type = type;
-    }
     // 
     // Operators
     // ---------------------------------------
 
     // Index assign
     void opIndexAssign(T)(T v, string key) {
+        enforceTOML(_type==TOMLType.Group);
         assign(v, key);
     }
 
     TOMLValue opIndexAssign(TOMLValue  v, string key) {
-        writefln("Adding %s to %s", v, key);
+        enforceTOML(_type==TOMLType.Group);
         _store.keygroups[key] = v;
         return v;
     }
 
     ref inout(TOMLValue) opIndex(string v) inout {
+        enforceTOML(_type==TOMLType.Group);
         return _store.keygroups[v];
     }
 
-     auto opBinaryRight(string op : "in")(string k) const
+    auto opBinaryRight(string op : "in")(string k) const
     {
+        enforceTOML(_type==TOMLType.Group);
         return k in _store.keygroups;
     }
 
@@ -108,29 +123,36 @@ struct TOMLValue {
     // Value accessors
     // ---------------------------------------
     string str(){
+        enforceTOML(_type==TOMLType.String);
         return _store.stringv;
     }
 
     long integer() {
+        enforceTOML(_type==TOMLType.Integer);
         return _store.intv;
     }
 
     TOMLValue[] array() {
+        enforceTOML(_type==TOMLType.Array);
         return _store.arrayv;
     }
 
+    TOMLValue[string] group() {
+        enforceTOML(_type==TOMLType.Group);
+        return _store.keygroups;
+    }
+
     auto keys() { 
+        enforceTOML(_type==TOMLType.Group);
         return _store.keygroups.keys;
     }
 
 }
 
 void _toTOMLDictionary(ParseTree p, ref TOMLValue root, string current_header=null) {
-    writeln("Handling ", p.name);
 
     TOMLValue __valueLine(ParseTree valueNode){ 
         auto v = valueNode.matches[0];
-        writeln(valueNode.name);
         switch (valueNode.name) {
             case "TOML.IntegerValue": 
                 return TOMLValue(v.to!int);
@@ -157,15 +179,13 @@ void _toTOMLDictionary(ParseTree p, ref TOMLValue root, string current_header=nu
         case "TOML.ValueLine": 
             auto name = p.children[0].matches[0];   //Name node
             auto value = p.children[1].children[0]; //Value node
-            writeln("Adding node %d", name);
-            if (!current_header)
+            if (current_header==null)
                 root[name] = __valueLine(value);
             else {
                 auto k = current_header.split('.');
-                if (!(k[0] in root))
-                    root[k[0]] = TOMLValue(TOMLType.Group);
+                if (!(k[0] in root)) root[k[0]] = TOMLValue(TOMLType.Group);
                 TOMLValue * v = &root[k[0]];
-
+                
                 foreach (t; k[1..$]) {
                     if (!(t in v._store.keygroups))
                         v.assign(TOMLValue(TOMLType.Group), t);
@@ -189,14 +209,19 @@ void _toTOMLDictionary(ParseTree p, ref TOMLValue root, string current_header=nu
 
 TOMLValue parse(string data) {
     auto parseTree = TOML(data);
-    TOMLValue dict = new TOMLValue(TOMLType.Root);
+    TOMLValue dict = TOMLValue(TOMLType.Group);
     foreach(p; parseTree.children[0].children) {
         _toTOMLDictionary(p, dict);
     }
     return dict;
 }
 
+TOMLValue parseFile(string filename) {
+    return parse(readText(filename));
+}
+
 unittest {
+    import std.stdio;
 
     enum TEST1 = `
         key_string = "string_value"
