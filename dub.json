@@ -1,0 +1,11 @@
+{
+	"name": "toml.d",
+	"description": "A TOML parser for D",
+	"copyright": "Copyright © 2014, Tasos Vogiatzoglou",
+	"authors": ["Tasos Vogiatzoglou"],
+    "license": "BSL-1.0",
+    "targetType" : "library",
+	"dependencies": {
+        "pegged": "~master"
+	}
+}
