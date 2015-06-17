@@ -17,7 +17,7 @@ enum TOMLType {
 };
 
 class TOMLException: Exception {
-    this(string msg, string file="parser", ulong line=111) {
+    this(string msg, string file="parser", uint line=111) {
         super(msg, file, line);
     }
 }
