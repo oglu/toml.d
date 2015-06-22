@@ -44,14 +44,15 @@ struct TOMLValue {
         static if( is(T: string) ) {
             _store.stringv = val;
             _type = TOMLType.String;
-        } 
-        else static if ( is(T: long) ) {
-            _store.intv = val;
-            _type = TOMLType.Integer;
         }
+        // bool needs to to be assigned before long, because long eats bool!
         else static if ( is(T: bool) ) {
             _store.boolv = val;
             _type = TOMLType.Boolean;
+        }
+        else static if ( is(T: long) ) {
+            _store.intv = val;
+            _type = TOMLType.Integer;
         }
         else static if ( is(T: float) ) {
             _store.floatv = val;
@@ -130,6 +131,11 @@ struct TOMLValue {
     long integer() {
         enforceTOML(_type==TOMLType.Integer);
         return _store.intv;
+    }
+
+    bool boolean() {
+        enforceTOML(_type==TOMLType.Boolean);
+        return _store.boolv;
     }
 
     TOMLValue[] array() {
@@ -229,10 +235,12 @@ unittest {
 
         [servers]
         a = 12
+        managed = true
 
         [servers.test]
         a = 12
         ports = [1,2,3]
+        operational = false
         `;
 
     auto d = parse(TEST1);
@@ -241,7 +249,10 @@ unittest {
     writefln("Servers: %s", d["servers"].keys);
     writefln("All: %s", d.keys);
     assert(d["servers"]["a"].integer == 12);
+    assert(d["servers"]["managed"].boolean == true);
     assert(d["servers"]["test"]["a"].integer == 12);
+    assert(d["servers"]["test"]["ports"].array[0].integer == 1);
     assert(d["servers"]["test"]["ports"].array[2].integer == 3);
+    assert(d["servers"]["test"]["operational"].boolean == false);
 
 }
