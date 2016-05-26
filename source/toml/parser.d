@@ -3,6 +3,7 @@ module toml.parser;
 import toml.grammar;
 import pegged.grammar;
 import std.array: split;
+import std.conv: to;
 import std.exception;
 import std.file : readText;
 
