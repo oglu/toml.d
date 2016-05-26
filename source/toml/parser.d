@@ -133,6 +133,11 @@ struct TOMLValue {
         return _store.intv;
     }
 
+    float floating() {
+        enforceTOML(_type==TOMLType.Float);
+        return _store.floatv;
+    }
+
     bool boolean() {
         enforceTOML(_type==TOMLType.Boolean);
         return _store.boolv;
@@ -232,6 +237,7 @@ unittest {
     enum TEST1 = `
         key_string = "string_value"
         key_array = ["string_1", "string_2"]
+        float_value = 17.23
 
         [servers]
         a = 12
@@ -246,6 +252,7 @@ unittest {
     auto d = parse(TEST1);
 
     assert(d["key_string"].str == "string_value");
+    assert(d["float_value"].floating == 17.23f);
     writefln("Servers: %s", d["servers"].keys);
     writefln("All: %s", d.keys);
     assert(d["servers"]["a"].integer == 12);
