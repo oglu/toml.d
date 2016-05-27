@@ -47,7 +47,10 @@ TOML:
   # DateTime
   # -------------------------------------------
 
-  DatetimeValue     <~ ([1-9] digit digit digit) "-" (digit digit) "-" (digit digit) "T" (digit digit) ":" (digit digit) ":" (digit digit) "Z"
+  DatetimeValue     <~ ([1-9] digit digit digit) "-" (digit digit) "-" (digit digit)
+                        "T" (digit digit) ":" (digit digit) ":" (digit digit)
+                        ("." digit digit digit digit digit digit)?
+                        (("-" / "+") (digit digit) ":" (digit digit) / "Z")?
 
   #
   # Boolean
@@ -186,6 +189,8 @@ unittest {
         key_string_array = ["abc","cde"]
         arrayOfArrays = [[1,2], ["a","b"], [1.2, 1.2]]
         date = 1979-05-27T07:32:00Z
+        date_two = 1979-05-27T00:32:00-07:00
+        anotherdate = 1979-05-27T00:32:00.999999-07:00
         multistring = "
             hello \tworld
             this is a big 

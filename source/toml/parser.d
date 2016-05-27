@@ -3,6 +3,7 @@ module toml.parser;
 import toml.grammar;
 import pegged.grammar;
 import std.array: split;
+import std.datetime : SysTime;
 import std.exception;
 import std.file : readText;
 
@@ -44,20 +45,27 @@ struct TOMLValue {
         static if( is(T: string) ) {
             _store.stringv = val;
             _type = TOMLType.String;
-        } 
-        else static if ( is(T: long) ) {
-            _store.intv = val;
-            _type = TOMLType.Integer;
         }
+        // bool needs to to be assigned before long, because long eats bool!
         else static if ( is(T: bool) ) {
             _store.boolv = val;
             _type = TOMLType.Boolean;
+        }
+        else static if ( is(T: long) ) {
+            _store.intv = val;
+            _type = TOMLType.Integer;
         }
         else static if ( is(T: float) ) {
             _store.floatv = val;
             _type = TOMLType.Float;
         }
-        else 
+        else static if ( is(T: SysTime) ) {
+            // Hack: store the datetime in string representation, SysTime
+            // cannot be part of Store as it has no default initializer
+            _store.stringv = val.toISOExtString();
+            _type = TOMLType.Datetime;
+        }
+        else
             static assert(0, "Unknown type");
         
     }
@@ -132,6 +140,21 @@ struct TOMLValue {
         return _store.intv;
     }
 
+    float floating() {
+        enforceTOML(_type==TOMLType.Float);
+        return _store.floatv;
+    }
+
+    bool boolean() {
+        enforceTOML(_type==TOMLType.Boolean);
+        return _store.boolv;
+    }
+
+    SysTime datetime() {
+        enforceTOML(_type==TOMLType.Datetime);
+        return SysTime.fromISOExtString(_store.stringv);
+    }
+
     TOMLValue[] array() {
         enforceTOML(_type==TOMLType.Array);
         return _store.arrayv;
@@ -162,6 +185,8 @@ void _toTOMLDictionary(ParseTree p, ref TOMLValue root, string current_header=nu
                 return TOMLValue(v.to!float);
             case "TOML.BooleanValue":
                 return TOMLValue(v.to!bool);
+            case "TOML.DatetimeValue":
+                return TOMLValue(SysTime.fromISOExtString(v.to!string));
             case "TOML.Array":
                 TOMLValue[] vals;
                 //first children is the typed array match
@@ -221,27 +246,39 @@ TOMLValue parseFile(string filename) {
 }
 
 unittest {
+    import std.datetime: DateTime, UTC;
     import std.stdio;
 
     enum TEST1 = `
         key_string = "string_value"
         key_array = ["string_1", "string_2"]
+        float_value = 17.23
 
         [servers]
         a = 12
+        managed = true
+        last_reboot = 2011-02-23T22:11:43Z
 
         [servers.test]
         a = 12
         ports = [1,2,3]
+        operational = false
         `;
 
     auto d = parse(TEST1);
 
     assert(d["key_string"].str == "string_value");
+    assert(d["float_value"].floating == 17.23f);
     writefln("Servers: %s", d["servers"].keys);
     writefln("All: %s", d.keys);
     assert(d["servers"]["a"].integer == 12);
+    assert(d["servers"]["managed"].boolean == true);
+    writefln("last_reboot: %s", d["servers"]["last_reboot"].datetime.toISOExtString);
+    assert(d["servers"]["last_reboot"].datetime ==
+            SysTime(DateTime(2011, 2, 23, 22, 11, 43), UTC()));
     assert(d["servers"]["test"]["a"].integer == 12);
+    assert(d["servers"]["test"]["ports"].array[0].integer == 1);
     assert(d["servers"]["test"]["ports"].array[2].integer == 3);
+    assert(d["servers"]["test"]["operational"].boolean == false);
 
 }
