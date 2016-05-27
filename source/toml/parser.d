@@ -3,6 +3,7 @@ module toml.parser;
 import toml.grammar;
 import pegged.grammar;
 import std.array: split;
+import std.datetime : SysTime;
 import std.exception;
 import std.file : readText;
 
@@ -58,7 +59,13 @@ struct TOMLValue {
             _store.floatv = val;
             _type = TOMLType.Float;
         }
-        else 
+        else static if ( is(T: SysTime) ) {
+            // Hack: store the datetime in string representation, SysTime
+            // cannot be part of Store as it has no default initializer
+            _store.stringv = val.toISOExtString();
+            _type = TOMLType.Datetime;
+        }
+        else
             static assert(0, "Unknown type");
         
     }
@@ -143,6 +150,11 @@ struct TOMLValue {
         return _store.boolv;
     }
 
+    SysTime datetime() {
+        enforceTOML(_type==TOMLType.Datetime);
+        return SysTime.fromISOExtString(_store.stringv);
+    }
+
     TOMLValue[] array() {
         enforceTOML(_type==TOMLType.Array);
         return _store.arrayv;
@@ -173,6 +185,8 @@ void _toTOMLDictionary(ParseTree p, ref TOMLValue root, string current_header=nu
                 return TOMLValue(v.to!float);
             case "TOML.BooleanValue":
                 return TOMLValue(v.to!bool);
+            case "TOML.DatetimeValue":
+                return TOMLValue(SysTime.fromISOExtString(v.to!string));
             case "TOML.Array":
                 TOMLValue[] vals;
                 //first children is the typed array match
@@ -232,6 +246,7 @@ TOMLValue parseFile(string filename) {
 }
 
 unittest {
+    import std.datetime: DateTime, UTC;
     import std.stdio;
 
     enum TEST1 = `
@@ -242,6 +257,7 @@ unittest {
         [servers]
         a = 12
         managed = true
+        last_reboot = 2011-02-23T22:11:43Z
 
         [servers.test]
         a = 12
@@ -257,6 +273,9 @@ unittest {
     writefln("All: %s", d.keys);
     assert(d["servers"]["a"].integer == 12);
     assert(d["servers"]["managed"].boolean == true);
+    writefln("last_reboot: %s", d["servers"]["last_reboot"].datetime.toISOExtString);
+    assert(d["servers"]["last_reboot"].datetime ==
+            SysTime(DateTime(2011, 2, 23, 22, 11, 43), UTC()));
     assert(d["servers"]["test"]["a"].integer == 12);
     assert(d["servers"]["test"]["ports"].array[0].integer == 1);
     assert(d["servers"]["test"]["ports"].array[2].integer == 3);
