@@ -5,6 +5,7 @@ import pegged.grammar;
 import std.array: split;
 import std.exception;
 import std.file : readText;
+import std.conv : to;
 
 enum TOMLType {
     String,
@@ -29,7 +30,7 @@ struct TOMLValue {
     union Store {
         string stringv;
         long intv;
-        float floatv;
+        double floatv;
         bool boolv;
         TOMLValue[] arrayv;
         TOMLValue[string] keygroups;
@@ -53,7 +54,7 @@ struct TOMLValue {
             _store.boolv = val;
             _type = TOMLType.Boolean;
         }
-        else static if ( is(T: float) ) {
+        else static if ( is(T: double) ) {
             _store.floatv = val;
             _type = TOMLType.Float;
         }
@@ -159,7 +160,7 @@ void _toTOMLDictionary(ParseTree p, ref TOMLValue root, string current_header=nu
             case "TOML.StringValue": 
                 return TOMLValue(v.to!string);
             case "TOML.FloatValue": 
-                return TOMLValue(v.to!float);
+                return TOMLValue(v.to!double);
             case "TOML.BooleanValue":
                 return TOMLValue(v.to!bool);
             case "TOML.Array":
