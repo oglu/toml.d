@@ -141,7 +141,7 @@ struct TOMLValue {
         return _store.intv;
     }
 
-    float floating() {
+    double floating() {
         enforceTOML(_type==TOMLType.Float);
         return _store.floatv;
     }
