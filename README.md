@@ -1,4 +1,3 @@
-=======
 toml.d. A TOML Parser for D
 ============================
 
@@ -36,7 +35,6 @@ auto config = parseFile("/path/to/toml.conf");
 TODO
 --------------
 
-1) Date support
-2) Tables in tables
+1) Tables in tables
 
 
