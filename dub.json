@@ -6,6 +6,6 @@
     "license": "BSL-1.0",
     "targetType" : "library",
 	"dependencies": {
-        "pegged": "0.2.1"
+        "pegged": "~>0.3.3"
 	}
 }
